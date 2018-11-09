@@ -46,9 +46,6 @@
    Default: PLUGIN
          Plugin:
            Library: [fabric路径]/examples/plugins/smPlugin/smPlugin.so
-           Config:
-             cardLib:
-             keyStore:  [peer端msp]/keystore
 `````
 2. orderer端配置bccsp插件
 
@@ -57,9 +54,6 @@
    Default: PLUGIN
          Plugin:
            Library: [fabric路径]/examples/plugins/smPlugin/smPlugin.so
-           Config:
-             cardLib:
-             keyStore:  [orderer端msp]/keystore
 `````
 3. cryptogensm使用方式
 
