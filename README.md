@@ -21,7 +21,7 @@
 
 * git clone https://github.com/flyinox/fabric-sm-patch.git
 
-* git am fabric-sm-patch
+* git am ./fabric-sm-patch/fabric-sm-patch
 
 * make [docker | native]
 
