@@ -1,8 +1,12 @@
 ## Hyperledger Fabric 国密补丁
 
-用于Hyperledger Fabric项目支持国密算法，当前支持release1.3.x，暂不支持非release版本。
+#####开启动态链接版本
 
-包含国密算法插件(bccsp插件)，包括支持国密证书和秘钥的cryptogen
+用于Hyperledger Fabric项目支持国密算法，支持V1.1.x以上版本
+
+cryptogen工具配套支持
+
+当前版本采用非插件方式
 
 ### 准备条件
 ---
@@ -15,7 +19,6 @@
 ### 安装步骤
 ---
 
-(**注意**，当前只支持release1.3.x版本，如果需要支持非release版本，需要自行解决冲突)
 
 在fabric主目录下
 
@@ -31,11 +34,7 @@
 
   若使用native方式运行，请注意在peer或者orderer启动时，配置config文件中bccsp密码插件的位置（peer对应core.yaml, orderer对应orderer.yaml），更改方式参见下一章节
 
+  (**注意**，当前dep 和 test 跑不过，所以make docker的时候最后会报错，不影响使用)
 
-### cryptogen使用方式
-------
+  (**注意** 此版本开启了动态链接，并且补丁工程内部带有libltdl.so.7，如果需要动态链接方式加载so库，请在启动peer/orderer容器时，将此文件映射到peer/orderer容器的/usr/lib/x86_64-linux-gnu/libltdl.so.7上)
 
-
-​	使用方式为和普通cryptogen相似，增加--pluginPath选项，指定国密版bccsp插件位置，若不指定bccsp插件位置，则默认位置为/etc/hyperledger/fabric/smPlugin.so
-
-cryptogen generate   --pluginPath [smPlugin.so]
