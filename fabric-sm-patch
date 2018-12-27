@@ -1,4 +1,4 @@
-From 841de2aca9cd65f02543a0861f180d9ba8d53355 Mon Sep 17 00:00:00 2001
+From 4ef326ac440185af3563fa239bda6a4806828583 Mon Sep 17 00:00:00 2001
 From: Dijun Liu <flyinox31@gmail.com>
 Date: Wed, 7 Nov 2018 11:48:02 +0800
 Subject: [PATCH] China crypto standards support
@@ -8,11 +8,12 @@ Subject: [PATCH] China crypto standards support
  bccsp/factory/nopkcs11.go                     |    4 +-
  bccsp/factory/pkcs11.go                       |    4 +-
  bccsp/gm/fileks.go                            |  407 ++
- bccsp/gm/impl.go                              |  379 ++
+ bccsp/gm/impl.go                              |  391 ++
  bccsp/gm/keys.go                              |  415 ++
  bccsp/gm/sm2.go                               |   78 +
  bccsp/gm/sm2key.go                            |  119 +
- bccsp/sm2opts.go                              |  119 +
+ bccsp/gm/sm3sig.go                            |   51 +
+ bccsp/sm2opts.go                              |  131 +
  bccsp/utils/keys.go                           |    3 +-
  common/tools/cryptogen/ca/generator.go        |    2 +
  common/tools/cryptogen/ca/generatorsm.go      |  241 +
@@ -22,6 +23,7 @@ Subject: [PATCH] China crypto standards support
  common/tools/cryptogen/mainsm.go              |  719 +++
  common/tools/cryptogen/msp/generator.go       |    2 +
  common/tools/cryptogen/msp/generatorsm.go     |  284 +
+ core/common/validation/msgvalidation.go       |    2 +-
  docker-env.mk                                 |    2 +-
  examples/plugins/smPlugin/fileks.go           |  407 ++
  examples/plugins/smPlugin/impl.go             |  372 ++
@@ -29,18 +31,25 @@ Subject: [PATCH] China crypto standards support
  examples/plugins/smPlugin/sm2.go              |   78 +
  examples/plugins/smPlugin/sm2key.go           |  119 +
  msp/cert.go                                   |    3 +-
- msp/identities.go                             |   30 +-
+ msp/identities.go                             |   32 +-
  msp/mspimpl.go                                |    3 +-
  msp/mspimplsetup.go                           |    3 +-
  msp/mspimplvalidate.go                        |    3 +-
- .../flyinox/crypto/sm/sm2/p256sm2.go          |   51 +
- .../github.com/flyinox/crypto/sm/sm2/sm2.go   |  166 +
- .../flyinox/crypto/sm/sm2/sm2_test.go         |  114 +
- .../github.com/flyinox/crypto/sm/sm3/sm3.go   |  146 +
+ .../crypto/internal/randutil/randutil.go      |   38 +
+ .../crypto/internal/subtle/aliasing.go        |   34 +
+ .../internal/subtle/aliasing_appengine.go     |   37 +
+ .../crypto/internal/subtle/aliasing_test.go   |   50 +
+ .../flyinox/crypto/sm/sm2/p256sm2.go          |   54 +
+ .../github.com/flyinox/crypto/sm/sm2/sm2.go   |  224 +
+ .../flyinox/crypto/sm/sm2/sm2_test.go         |  223 +
+ .../flyinox/crypto/sm/sm2/sm2enc.go           |  168 +
+ .../github.com/flyinox/crypto/sm/sm3/sm3.go   |  149 +
  .../flyinox/crypto/sm/sm3/sm3_test.go         |   83 +
  .../flyinox/crypto/sm/sm3/sm3hash.go          |  172 +
- .../github.com/flyinox/crypto/sm/sm4/sm4.go   |  190 +
- .../flyinox/crypto/sm/sm4/sm4_test.go         |   50 +
+ .../flyinox/crypto/sm/sm3/sm3sig.go           |   72 +
+ .../flyinox/crypto/sm/sm4/cipher.go           |   42 +
+ .../flyinox/crypto/sm/sm4/cipher_test.go      |   65 +
+ .../github.com/flyinox/crypto/sm/sm4/sm4.go   |  125 +
  .../flyinox/crypto/x509/cert_pool.go          |  170 +
  .../flyinox/crypto/x509/example_test.go       |  134 +
  .../flyinox/crypto/x509/pem_decrypt.go        |  240 +
@@ -69,16 +78,17 @@ Subject: [PATCH] China crypto standards support
  .../flyinox/crypto/x509/test-file.crt         |   32 +
  .../github.com/flyinox/crypto/x509/verify.go  |  565 ++
  .../flyinox/crypto/x509/verify_test.go        | 1694 ++++++
- vendor/github.com/flyinox/crypto/x509/x509.go | 2395 ++++++++
+ vendor/github.com/flyinox/crypto/x509/x509.go | 2421 ++++++++
  .../flyinox/crypto/x509/x509_test.go          | 1425 +++++
  .../flyinox/crypto/x509/x509_test_import.go   |   53 +
- 68 files changed, 19044 insertions(+), 13 deletions(-)
+ 77 files changed, 19712 insertions(+), 14 deletions(-)
  create mode 100644 bccsp/factory/gmfactory.go
  create mode 100644 bccsp/gm/fileks.go
  create mode 100644 bccsp/gm/impl.go
  create mode 100644 bccsp/gm/keys.go
  create mode 100644 bccsp/gm/sm2.go
  create mode 100644 bccsp/gm/sm2key.go
+ create mode 100644 bccsp/gm/sm3sig.go
  create mode 100644 bccsp/sm2opts.go
  create mode 100644 common/tools/cryptogen/ca/generatorsm.go
  create mode 100644 common/tools/cryptogen/csp/cspsm.go
@@ -89,14 +99,21 @@ Subject: [PATCH] China crypto standards support
  create mode 100644 examples/plugins/smPlugin/keys.go
  create mode 100644 examples/plugins/smPlugin/sm2.go
  create mode 100644 examples/plugins/smPlugin/sm2key.go
+ create mode 100644 vendor/github.com/flyinox/crypto/internal/randutil/randutil.go
+ create mode 100644 vendor/github.com/flyinox/crypto/internal/subtle/aliasing.go
+ create mode 100644 vendor/github.com/flyinox/crypto/internal/subtle/aliasing_appengine.go
+ create mode 100644 vendor/github.com/flyinox/crypto/internal/subtle/aliasing_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm2/p256sm2.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm2/sm2.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm2/sm2_test.go
+ create mode 100644 vendor/github.com/flyinox/crypto/sm/sm2/sm2enc.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3hash.go
+ create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go
+ create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/cipher.go
+ create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/cipher_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/sm4.go
- create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/sm4_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/x509/cert_pool.go
  create mode 100644 vendor/github.com/flyinox/crypto/x509/example_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/x509/pem_decrypt.go
@@ -131,7 +148,7 @@ Subject: [PATCH] China crypto standards support
 
 diff --git a/bccsp/factory/gmfactory.go b/bccsp/factory/gmfactory.go
 new file mode 100644
-index 000000000..71b44b2db
+index 000000000..7330a7f74
 --- /dev/null
 +++ b/bccsp/factory/gmfactory.go
 @@ -0,0 +1,42 @@
@@ -177,6 +194,7 @@ index 000000000..71b44b2db
 +
 +	return gm.New(keystore)
 +}
+\ No newline at end of file
 diff --git a/bccsp/factory/nopkcs11.go b/bccsp/factory/nopkcs11.go
 index a83695fa6..77125fecf 100644
 --- a/bccsp/factory/nopkcs11.go
@@ -636,10 +654,10 @@ index 000000000..af93dd917
 +}
 diff --git a/bccsp/gm/impl.go b/bccsp/gm/impl.go
 new file mode 100644
-index 000000000..3dded0389
+index 000000000..f818aec15
 --- /dev/null
 +++ b/bccsp/gm/impl.go
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,391 @@
 +/*
 +Copyright IBM Corp. All Rights Reserved.
 +
@@ -652,11 +670,12 @@ index 000000000..3dded0389
 +
 +	"crypto/rand"
 +	"fmt"
-+	"math/big"
-+
 +	"github.com/flyinox/crypto/sm/sm2"
 +	"github.com/flyinox/crypto/sm/sm3"
 +	"github.com/flyinox/crypto/x509"
++	"math/big"
++
++	origx509 "crypto/x509"
 +
 +	"os"
 +	"path/filepath"
@@ -939,7 +958,12 @@ index 000000000..3dded0389
 +		case *sm2.PublicKey:
 +			return &sm2PublicKey{pk.(*sm2.PublicKey)}, nil
 +		default:
-+			return csp.sw.KeyImport(raw, opts)
++			//convert to origin x509
++			origCert, err := origx509.ParseCertificate(raw.(*x509.Certificate).Raw)
++			if err != nil {
++				return nil, errors.New("Invalid raw material. can't do x509 converting from flyinox x509 to origin x509.")
++			}
++			return csp.sw.KeyImport(origCert, opts)
 +		}
 +	default:
 +		return csp.sw.KeyImport(raw, opts)
@@ -964,6 +988,10 @@ index 000000000..3dded0389
 +		h := sm3.New()
 +		h.Write(msg)
 +		return h.Sum(nil), nil
++	case *bccsp.SM3SIGOpts:
++		h := NewSM3Sig()
++		h.Write(msg)
++		return h.Sum(nil), nil
 +	default:
 +		return csp.sw.Hash(msg, opts)
 +	}
@@ -975,6 +1003,8 @@ index 000000000..3dded0389
 +	switch opts.(type) {
 +	case *bccsp.SM3Opts:
 +		return sm3.New(), nil
++	case *bccsp.SM3SIGOpts:
++		return
 +	default:
 +		return csp.sw.GetHash(opts)
 +	}
@@ -1526,7 +1556,7 @@ index 000000000..8a58ba7c9
 +}
 diff --git a/bccsp/gm/sm2key.go b/bccsp/gm/sm2key.go
 new file mode 100644
-index 000000000..32ef2bf3c
+index 000000000..911123e75
 --- /dev/null
 +++ b/bccsp/gm/sm2key.go
 @@ -0,0 +1,119 @@
@@ -1649,12 +1679,71 @@ index 000000000..32ef2bf3c
 +func (k *sm2PublicKey) PublicKey() (bccsp.Key, error) {
 +	return k, nil
 +}
+\ No newline at end of file
+diff --git a/bccsp/gm/sm3sig.go b/bccsp/gm/sm3sig.go
+new file mode 100644
+index 000000000..75ef47cf4
+--- /dev/null
++++ b/bccsp/gm/sm3sig.go
+@@ -0,0 +1,51 @@
++/*
++Copyright CETCS. 2017 All Rights Reserved.
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++	SPDX-License-Identifier: Apache-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++package gm
++
++import "hash"
++
++type sm3sig struct {
++	msg []byte
++}
++
++func NewSM3Sig() hash.Hash {
++	return &sm3sig{}
++}
++
++func (d *sm3sig) Write(p []byte) (n int, err error) {
++	d.msg = append(d.msg, p...)
++	return len(d.msg), nil
++}
++
++func (d *sm3sig) Sum(b []byte) []byte {
++	if b != nil {
++		panic("sm3sig fail: b must be nil")
++	}
++
++	return d.msg
++}
++
++func (d *sm3sig) Reset() {
++	d.msg = d.msg[:0]
++}
++
++func (d *sm3sig) Size() int {
++	return 0
++}
++
++func (d *sm3sig) BlockSize() int {
++	return 0
++}
+\ No newline at end of file
 diff --git a/bccsp/sm2opts.go b/bccsp/sm2opts.go
 new file mode 100644
-index 000000000..82c9db5de
+index 000000000..b09e95446
 --- /dev/null
 +++ b/bccsp/sm2opts.go
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,131 @@
 +/*
 +Copyright IBM Corp. 2016 All Rights Reserved.
 +
@@ -1675,6 +1764,9 @@ index 000000000..82c9db5de
 +const (
 +	SM2 = "SM2"
 +	SM3 = "SM3"
++	//This is used for indicating hashopts while doing sm3 before sm2 signature
++	// through which hash will actually do nothing
++	SM3SIG = "SM3SIG"
 +	// SM2ReRand SM2 key re-randomization
 +	SM2ReRand = "SM2"
 +)
@@ -1686,6 +1778,15 @@ index 000000000..82c9db5de
 +// Algorithm returns the hash algorithm identifier (to be used).
 +func (opts *SM3Opts) Algorithm() string {
 +	return SM3
++}
++
++// SHA256Opts contains options relating to SHA-256.
++type SM3SIGOpts struct {
++}
++
++// Algorithm returns the hash algorithm identifier (to be used).
++func (opts *SM3SIGOpts) Algorithm() string {
++	return SM3SIG
 +}
 +
 +// SM2KeyGenOpts contains options for SM2 key generation.
@@ -3264,6 +3365,19 @@ index 000000000..e95261383
 +
 +	return err
 +}
+diff --git a/core/common/validation/msgvalidation.go b/core/common/validation/msgvalidation.go
+index 2407d996d..babc5db4d 100644
+--- a/core/common/validation/msgvalidation.go
++++ b/core/common/validation/msgvalidation.go
+@@ -111,7 +111,7 @@ func ValidateProposalMessage(signedProp *pb.SignedProposal) (*pb.Proposal, *comm
+ 			err = errors.Wrap(err, "could not deserialize a SerializedIdentity")
+ 			putilsLogger.Warningf("channel [%s]: %s", chdr.ChannelId, err)
+ 		}
+-		return nil, nil, nil, errors.Errorf("access denied: channel [%s] creator org [%s]", chdr.ChannelId, sId.Mspid)
++		return nil, nil, nil, errors.Errorf("access denied: channel [%s] creator org [%s], err:%s", chdr.ChannelId, sId.Mspid, err.Error())
+ 	}
+ 
+ 	// Verify that the transaction ID has been computed properly.
 diff --git a/docker-env.mk b/docker-env.mk
 index 1c5236fb7..7846aabd7 100644
 --- a/docker-env.mk
@@ -4720,7 +4834,7 @@ index fc823e189..93b955655 100644
  	"github.com/pkg/errors"
  )
 diff --git a/msp/identities.go b/msp/identities.go
-index 1b625e310..382a988b6 100644
+index 1b625e310..e174af22d 100644
 --- a/msp/identities.go
 +++ b/msp/identities.go
 @@ -19,11 +19,12 @@ package msp
@@ -4755,8 +4869,8 @@ index 1b625e310..382a988b6 100644
 +	switch id.cert.PublicKeyAlgorithm {
 +	case x509.ECDSA:
 +		hashFamily = id.msp.cryptoConfig.SignatureHashFamily
-+	case x509.SM2:
-+		hashFamily = bccsp.SM3
++	case x509.SM2://We here verify the msg instead of the digest of msg
++		hashFamily = bccsp.SM3SIG
 +	default:
 +		hashFamily = id.msp.cryptoConfig.SignatureHashFamily
 +	}
@@ -4764,16 +4878,18 @@ index 1b625e310..382a988b6 100644
  	if err != nil {
  		return errors.WithMessage(err, "failed getting hash function options")
  	}
-@@ -205,6 +217,8 @@ func (id *identity) getHashOpt(hashFamily string) (bccsp.HashOpts, error) {
+@@ -205,6 +217,10 @@ func (id *identity) getHashOpt(hashFamily string) (bccsp.HashOpts, error) {
  		return bccsp.GetHashOpt(bccsp.SHA256)
  	case bccsp.SHA3:
  		return bccsp.GetHashOpt(bccsp.SHA3_256)
 +	case bccsp.SM3:
 +		return &bccsp.SM3Opts{}, nil
++	case bccsp.SM3SIG:
++		return &bccsp.SM3SIGOpts{}, nil
  	}
  	return nil, errors.Errorf("hash familiy not recognized [%s]", hashFamily)
  }
-@@ -231,7 +245,17 @@ func (id *signingidentity) Sign(msg []byte) ([]byte, error) {
+@@ -231,7 +247,17 @@ func (id *signingidentity) Sign(msg []byte) ([]byte, error) {
  	//mspIdentityLogger.Infof("Signing message")
  
  	// Compute Hash
@@ -4783,8 +4899,8 @@ index 1b625e310..382a988b6 100644
 +	switch id.cert.PublicKeyAlgorithm {
 +	case x509.ECDSA:
 +		hashFamily = id.msp.cryptoConfig.SignatureHashFamily
-+	case x509.SM2:
-+		hashFamily = bccsp.SM3
++	case x509.SM2://We here Sign the msg instead of the digest of msg
++		hashFamily = bccsp.SM3SIG
 +	default:
 +		hashFamily = id.msp.cryptoConfig.SignatureHashFamily
 +	}
@@ -4843,12 +4959,195 @@ index 31e7fc9ac..64e635c71 100644
  
  	"time"
  
+diff --git a/vendor/github.com/flyinox/crypto/internal/randutil/randutil.go b/vendor/github.com/flyinox/crypto/internal/randutil/randutil.go
+new file mode 100644
+index 000000000..84b1295a8
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/internal/randutil/randutil.go
+@@ -0,0 +1,38 @@
++// Copyright 2018 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Package randutil contains internal randomness utilities for various
++// crypto packages.
++package randutil
++
++import (
++	"io"
++	"sync"
++)
++
++var (
++	closedChanOnce sync.Once
++	closedChan     chan struct{}
++)
++
++// MaybeReadByte reads a single byte from r with ~50% probability. This is used
++// to ensure that callers do not depend on non-guaranteed behaviour, e.g.
++// assuming that rsa.GenerateKey is deterministic w.r.t. a given random stream.
++//
++// This does not affect tests that pass a stream of fixed bytes as the random
++// source (e.g. a zeroReader).
++func MaybeReadByte(r io.Reader) {
++	closedChanOnce.Do(func() {
++		closedChan = make(chan struct{})
++		close(closedChan)
++	})
++
++	select {
++	case <-closedChan:
++		return
++	case <-closedChan:
++		var buf [1]byte
++		r.Read(buf[:])
++	}
++}
+diff --git a/vendor/github.com/flyinox/crypto/internal/subtle/aliasing.go b/vendor/github.com/flyinox/crypto/internal/subtle/aliasing.go
+new file mode 100644
+index 000000000..2d8c8dadb
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/internal/subtle/aliasing.go
+@@ -0,0 +1,34 @@
++// Copyright 2018 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build !appengine
++
++// Package subtle implements functions that are often useful in cryptographic
++// code but require careful thought to use correctly.
++//
++// This is a mirror of golang.org/x/crypto/internal/subtle.
++package subtle
++
++import "unsafe"
++
++// AnyOverlap reports whether x and y share memory at any (not necessarily
++// corresponding) index. The memory beyond the slice length is ignored.
++func AnyOverlap(x, y []byte) bool {
++	return len(x) > 0 && len(y) > 0 &&
++		uintptr(unsafe.Pointer(&x[0])) <= uintptr(unsafe.Pointer(&y[len(y)-1])) &&
++		uintptr(unsafe.Pointer(&y[0])) <= uintptr(unsafe.Pointer(&x[len(x)-1]))
++}
++
++// InexactOverlap reports whether x and y share memory at any non-corresponding
++// index. The memory beyond the slice length is ignored. Note that x and y can
++// have different lengths and still not have any inexact overlap.
++//
++// InexactOverlap can be used to implement the requirements of the crypto/cipher
++// AEAD, Block, BlockMode and Stream interfaces.
++func InexactOverlap(x, y []byte) bool {
++	if len(x) == 0 || len(y) == 0 || &x[0] == &y[0] {
++		return false
++	}
++	return AnyOverlap(x, y)
++}
+diff --git a/vendor/github.com/flyinox/crypto/internal/subtle/aliasing_appengine.go b/vendor/github.com/flyinox/crypto/internal/subtle/aliasing_appengine.go
+new file mode 100644
+index 000000000..844f901d1
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/internal/subtle/aliasing_appengine.go
+@@ -0,0 +1,37 @@
++// Copyright 2018 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build appengine
++
++// Package subtle implements functions that are often useful in cryptographic
++// code but require careful thought to use correctly.
++//
++// This is a mirror of golang.org/x/crypto/internal/subtle.
++package subtle // import "crypto/internal/subtle"
++
++// This is the Google App Engine standard variant based on reflect
++// because the unsafe package and cgo are disallowed.
++
++import "reflect"
++
++// AnyOverlap reports whether x and y share memory at any (not necessarily
++// corresponding) index. The memory beyond the slice length is ignored.
++func AnyOverlap(x, y []byte) bool {
++	return len(x) > 0 && len(y) > 0 &&
++		reflect.ValueOf(&x[0]).Pointer() <= reflect.ValueOf(&y[len(y)-1]).Pointer() &&
++		reflect.ValueOf(&y[0]).Pointer() <= reflect.ValueOf(&x[len(x)-1]).Pointer()
++}
++
++// InexactOverlap reports whether x and y share memory at any non-corresponding
++// index. The memory beyond the slice length is ignored. Note that x and y can
++// have different lengths and still not have any inexact overlap.
++//
++// InexactOverlap can be used to implement the requirements of the crypto/cipher
++// AEAD, Block, BlockMode and Stream interfaces.
++func InexactOverlap(x, y []byte) bool {
++	if len(x) == 0 || len(y) == 0 || &x[0] == &y[0] {
++		return false
++	}
++	return AnyOverlap(x, y)
++}
+diff --git a/vendor/github.com/flyinox/crypto/internal/subtle/aliasing_test.go b/vendor/github.com/flyinox/crypto/internal/subtle/aliasing_test.go
+new file mode 100644
+index 000000000..f1e723848
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/internal/subtle/aliasing_test.go
+@@ -0,0 +1,50 @@
++// Copyright 2018 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package subtle_test
++
++import (
++	"testing"
++
++	"crypto/internal/subtle"
++)
++
++var a, b [100]byte
++
++var aliasingTests = []struct {
++	x, y                       []byte
++	anyOverlap, inexactOverlap bool
++}{
++	{a[:], b[:], false, false},
++	{a[:], b[:0], false, false},
++	{a[:], b[:50], false, false},
++	{a[40:50], a[50:60], false, false},
++	{a[40:50], a[60:70], false, false},
++	{a[:51], a[50:], true, true},
++	{a[:], a[:], true, false},
++	{a[:50], a[:60], true, false},
++	{a[:], nil, false, false},
++	{nil, nil, false, false},
++	{a[:], a[:0], false, false},
++	{a[:10], a[:10:20], true, false},
++	{a[:10], a[5:10:20], true, true},
++}
++
++func testAliasing(t *testing.T, i int, x, y []byte, anyOverlap, inexactOverlap bool) {
++	any := subtle.AnyOverlap(x, y)
++	if any != anyOverlap {
++		t.Errorf("%d: wrong AnyOverlap result, expected %v, got %v", i, anyOverlap, any)
++	}
++	inexact := subtle.InexactOverlap(x, y)
++	if inexact != inexactOverlap {
++		t.Errorf("%d: wrong InexactOverlap result, expected %v, got %v", i, inexactOverlap, any)
++	}
++}
++
++func TestAliasing(t *testing.T) {
++	for i, tt := range aliasingTests {
++		testAliasing(t, i, tt.x, tt.y, tt.anyOverlap, tt.inexactOverlap)
++		testAliasing(t, i, tt.y, tt.x, tt.anyOverlap, tt.inexactOverlap)
++	}
++}
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm2/p256sm2.go b/vendor/github.com/flyinox/crypto/sm/sm2/p256sm2.go
 new file mode 100644
-index 000000000..a39bc8a73
+index 000000000..9cd949b2a
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm2/p256sm2.go
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +/*
 +Copyright Suzhou Tongji Fintech Research Institute 2017 All Rights Reserved.
 +Licensed under the Apache License, Version 2.0 (the "License");
@@ -4881,6 +5180,9 @@ index 000000000..a39bc8a73
 +var p256sm2Curve p256Curve
 +var initonce sync.Once
 +
++var SM2PARAM_A,_ = new(big.Int).SetString("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC", 16)
++
++
 +// 取自elliptic的p256.go文件，修改曲线参数为sm2
 +// See FIPS 186-3, section D.2.3
 +func initP256Sm2() {
@@ -4900,12 +5202,13 @@ index 000000000..a39bc8a73
 +	initonce.Do(initP256Sm2)
 +	return p256sm2Curve
 +}
+\ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm2/sm2.go b/vendor/github.com/flyinox/crypto/sm/sm2/sm2.go
 new file mode 100644
-index 000000000..fdbcbc105
+index 000000000..18d2e5172
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm2/sm2.go
-@@ -0,0 +1,166 @@
+@@ -0,0 +1,224 @@
 +// Copyright 2011 The Go Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style
 +// license that can be found in the LICENSE file.
@@ -4918,6 +5221,7 @@ index 000000000..fdbcbc105
 +	"crypto/elliptic"
 +	"encoding/asn1"
 +	"errors"
++	"github.com/flyinox/crypto/sm/sm3"
 +	"io"
 +	"math/big"
 +)
@@ -4935,6 +5239,8 @@ index 000000000..fdbcbc105
 +type sm2Signature struct {
 +	R, S *big.Int
 +}
++
++var generateRandK  = _generateRandK
 +
 +// The SM2's private key contains the public key
 +func (priv *PrivateKey) Public() crypto.PublicKey {
@@ -4989,8 +5295,7 @@ index 000000000..fdbcbc105
 +
 +var errZeroParam = errors.New("zero parameter")
 +
-+//优化，去掉one
-+func generateRandK(rand io.Reader, c elliptic.Curve) (k *big.Int) {
++func _generateRandK(rand io.Reader, c elliptic.Curve) (k *big.Int) {
 +	params := c.Params()
 +	b := make([]byte, params.BitSize/8+8)
 +	_, err := io.ReadFull(rand, b)
@@ -5004,15 +5309,38 @@ index 000000000..fdbcbc105
 +	return
 +}
 +
++func getZById(pub *PublicKey, id []byte) []byte{
++	var lena = uint16(len(id) * 8) //bit len of IDA
++	var ENTLa = []byte{byte(lena>>8), byte(lena)}
++	var z = make([]byte, 0, 1024)
 +
-+func Sign(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.Int, err error) {
++	z = append(z, ENTLa...)
++	z = append(z, id...)
++	z = append(z, SM2PARAM_A.Bytes()...)
++	z = append(z, P256Sm2().Params().B.Bytes()...)
++	z = append(z, P256Sm2().Params().Gx.Bytes()...)
++	z = append(z, P256Sm2().Params().Gy.Bytes()...)
++	z = append(z, pub.X.Bytes()...)
++	z = append(z, pub.Y.Bytes()...)
++	return sm3.SumSM3(z)
++}
++//Za = sm3(ENTL||IDa||a||b||Gx||Gy||Xa||Xy)
++func getZ(pub *PublicKey) []byte {
++	return getZById(pub, []byte("1234567812345678"))
++}
++
++func Sign(rand io.Reader, priv *PrivateKey, msg []byte) (r, s *big.Int, err error) {
 +	var one = new(big.Int).SetInt64(1)
-+	if len(hash) < 32 {
-+		err = errors.New("The length of hash has short than what SM2 need.")
-+		return
-+	}
-+	var tmp []byte = hash[0:32]
-+	e := new(big.Int).SetBytes(tmp)
++	//if len(hash) < 32 {
++	//	err = errors.New("The length of hash has short than what SM2 need.")
++	//	return
++	//}
++
++	var m = make([]byte, 32+len(msg))
++	copy(m, getZ(&priv.PublicKey))
++	copy(m[32:], msg)
++
++	e := new(big.Int).SetBytes(sm3.SumSM3(m))
 +	k := generateRandK(rand, priv.PublicKey.Curve)
 +
 +	x1, _ := priv.PublicKey.Curve.ScalarBaseMult(k.Bytes())
@@ -5037,7 +5365,7 @@ index 000000000..fdbcbc105
 +	return
 +}
 +
-+func Verify(pub *PublicKey, hash []byte, r, s *big.Int) bool {
++func VerifyById(pub *PublicKey, msg,id []byte, r, s *big.Int) bool {
 +	c := pub.Curve
 +	N := c.Params().N
 +
@@ -5049,7 +5377,40 @@ index 000000000..fdbcbc105
 +	}
 +
 +	n := pub.Curve.Params().N
-+	e := new(big.Int).SetBytes(hash)
++
++	var m = make([]byte, 32+len(msg))
++	copy(m, getZById(pub, id))
++	copy(m[32:], msg)
++	e := new(big.Int).SetBytes(sm3.SumSM3(m))
++
++	t := new(big.Int).Add(r, s)
++	x11, y11 := pub.Curve.ScalarMult(pub.X, pub.Y, t.Bytes())
++	x12, y12 := pub.Curve.ScalarBaseMult(s.Bytes())
++	x1, _ := pub.Curve.Add(x11, y11, x12, y12)
++	x := new(big.Int).Add(e, x1)
++	x = x.Mod(x, n)
++
++	return x.Cmp(r) == 0
++}
++
++func Verify(pub *PublicKey, msg []byte, r, s *big.Int) bool {
++	c := pub.Curve
++	N := c.Params().N
++
++	if r.Sign() <= 0 || s.Sign() <= 0 {
++		return false
++	}
++	if r.Cmp(N) >= 0 || s.Cmp(N) >= 0 {
++		return false
++	}
++
++	n := pub.Curve.Params().N
++
++	var m = make([]byte, 32+len(msg))
++	copy(m, getZ(pub))
++	copy(m[32:], msg)
++	e := new(big.Int).SetBytes(sm3.SumSM3(m))
++
 +	t := new(big.Int).Add(r, s)
 +	x11, y11 := pub.Curve.ScalarMult(pub.X, pub.Y, t.Bytes())
 +	x12, y12 := pub.Curve.ScalarBaseMult(s.Bytes())
@@ -5072,12 +5433,13 @@ index 000000000..fdbcbc105
 +}
 +
 +var zeroReader = &zr{}
+\ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm2/sm2_test.go b/vendor/github.com/flyinox/crypto/sm/sm2/sm2_test.go
 new file mode 100644
-index 000000000..9a647e4c7
+index 000000000..a7d91e185
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm2/sm2_test.go
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,223 @@
 +// Copyright 2011 The Go Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style
 +// license that can be found in the LICENSE file.
@@ -5086,11 +5448,16 @@ index 000000000..9a647e4c7
 +package sm2
 +
 +import (
++	"bytes"
++	"crypto/elliptic"
 +	"crypto/rand"
-+	"crypto/sha256"
++	"encoding/hex"
 +	"fmt"
++	"github.com/flyinox/crypto/sm/sm3"
++	"github.com/stretchr/testify/assert"
++	"io"
++	"math/big"
 +	"testing"
-+	"crypto/sm/sm3"
 +)
 +
 +func TestSignVerify(t *testing.T) {
@@ -5100,7 +5467,7 @@ index 000000000..9a647e4c7
 +		panic("GenerateKey failed")
 +	}
 +
-+	hfunc := sha256.New()
++	hfunc := sm3.New()
 +	hfunc.Write(msg)
 +	hash := hfunc.Sum(nil)
 +
@@ -5127,6 +5494,23 @@ index 000000000..9a647e4c7
 +	hfunc.Write(msg)
 +	hash := hfunc.Sum(nil)
 +	fmt.Printf("hash:%02X\n", hash)
++	var done  = make(chan struct{})
++	go func(){
++		for i:=0;;i+=1 {
++			sig, err := priv.Sign(rand.Reader, hash, nil)
++			if err != nil {
++				panic(err)
++			}
++			if len(sig) == 73 {
++				fmt.Println("found it")
++				done <- struct{}{}
++				break
++			}
++			if i%100 == 0 {
++				break
++			}
++		}
++	}()
 +
 +	r, s, err := Sign(rand.Reader, priv, hash)
 +	if err != nil {
@@ -5139,6 +5523,7 @@ index 000000000..9a647e4c7
 +
 +	ret := Verify(&priv.PublicKey, hash, r, s)
 +	fmt.Println(ret)
++	<-done
 +}
 +
 +
@@ -5192,12 +5577,274 @@ index 000000000..9a647e4c7
 +		t.Errorf("Verify always works!")
 +	}
 +}
++
++func TestKDF(t *testing.T) {
++	x2,err := hex.DecodeString("64D20D27D0632957F8028C1E024F6B02EDF23102A566C932AE8BD613A8E865FE")
++	if err != nil {
++		t.Fatalf("%s", err.Error())
++	}
++	y2,err := hex.DecodeString("58D225ECA784AE300A81A2D48281A828E1CEDF11C4219099840265375077BF78")
++	if err != nil {
++		t.Fatalf("%s", err.Error())
++	}
++	expect,err := hex.DecodeString("006E30DAE231B071DFAD8AA379E90264491603")
++	klen := 152
++	actual := keyDerivation(append(x2, y2...), klen)
++	assert.Equal(t, expect, actual)
++}
++
++func TestENC_GMT_EX1(t *testing.T) {
++	p256Sm2ParamsTest := &elliptic.CurveParams{Name: "SM2-P-256-TEST"} // 注明为SM2
++	//SM2椭	椭 圆 曲 线 公 钥 密 码 算 法 推 荐 曲 线 参 数
++	p256Sm2ParamsTest.P, _ = new(big.Int).SetString("8542D69E4C044F18E8B92435BF6FF7DE457283915C45517D722EDB8B08F1DFC3", 16)
++	p256Sm2ParamsTest.N, _ = new(big.Int).SetString("8542D69E4C044F18E8B92435BF6FF7DD297720630485628D5AE74EE7C32E79B7", 16)
++	p256Sm2ParamsTest.B, _ = new(big.Int).SetString("63E4C6D3B23B0C849CF84241484BFE48F61D59A5B16BA06E6E12D1DA27C5249A", 16)
++	p256Sm2ParamsTest.Gx, _ = new(big.Int).SetString("421DEBD61B62EAB6746434EBC3CC315E32220B3BADD50BDC4C4E6C147FEDD43D", 16)
++	p256Sm2ParamsTest.Gy, _ = new(big.Int).SetString("0680512BCBB42C07D47349D2153B70C4E5D7FDFCBFA36EA1A85841B9E46E09A2", 16)
++	p256Sm2ParamsTest.BitSize = 256
++
++	p256sm2CurveTest := p256Curve{p256Sm2ParamsTest}
++
++	generateRandK = func (rand io.Reader, c elliptic.Curve) (k *big.Int) {
++		k,_ =  new(big.Int).SetString("4C62EEFD6ECFC2B95B92FD6C3D9575148AFA17425546D49018E5388D49DD7B4F", 16)
++		return k
++	}
++	expectA,_ := new(big.Int).SetString("787968B4FA32C3FD2417842E73BBFEFF2F3C848B6831D7E0EC65228B3937E498", 16)
++	Gy2 := p256sm2CurveTest.Gy.Mul(p256sm2CurveTest.Gy,p256sm2CurveTest.Gy)
++	gx := new(big.Int).SetBytes(p256sm2CurveTest.Gx.Bytes())
++	Gx2 := gx.Mul(p256sm2CurveTest.Gx,p256sm2CurveTest.Gx)
++	Gx3 := gx.Mul(Gx2,p256sm2CurveTest.Gx)
++	A := Gy2.Sub(Gy2,Gx3)
++	A = A.Sub(A,p256sm2CurveTest.B)
++	A = A.Div(A,p256sm2CurveTest.Gx)
++	assert.Equal(t,expectA.Bytes(), A.Bytes())
++
++
++	expectX,_ := new(big.Int).SetString("435B39CCA8F3B508C1488AFC67BE491A0F7BA07E581A0E4849A5CF70628A7E0A", 16)
++	expectY,_ := new(big.Int).SetString("75DDBA78F15FEECB4C7895E2C1CDF5FE01DEBB2CDBADF45399CCF77BBA076A42", 16)
++	priv := &PrivateKey{}
++	priv.PublicKey.Curve = p256sm2CurveTest
++	priv.D,_ = new(big.Int).SetString("1649AB77A00637BD5E2EFE283FBF353534AA7F7CB89463F208DDBC2920BB0DA0", 16)
++	priv.PublicKey.X,priv.PublicKey.Y = p256sm2CurveTest.ScalarBaseMult(priv.D.Bytes())
++	assert.True(t,p256sm2CurveTest.IsOnCurve(expectX,expectY))
++
++	//assert.Equal(t, expectX.Bytes(), priv.PublicKey.X.Bytes())
++	//assert.Equal(t, expectY.Bytes(), priv.PublicKey.Y.Bytes())
++}
++
++func TestCryptoToolCompare(t *testing.T) {
++	generateRandK = func(rand io.Reader, c elliptic.Curve) (k *big.Int) {
++		k,_ = new(big.Int).SetString("88E0271D16363C00D6456E151C095BAD4B75968E708234A9762146711D327FF3", 16)
++		return
++	}
++	priv := &PrivateKey{}
++	priv.PublicKey.Curve = P256Sm2()
++	priv.D,_ = new(big.Int).SetString("88E0271D16363C00D6456E151C095BAD4B75968E708234A9762146711D327FF3", 16)
++	priv.PublicKey.X,priv.PublicKey.Y = priv.PublicKey.ScalarBaseMult(priv.D.Bytes())
++
++	msg,_ := hex.DecodeString("88E0271D16363C00D6456E151C095BAD4B75968E708234A9762146711D327FF3")
++	Encrypt(rand.Reader, msg, &priv.PublicKey)
++}
++
++func TestEnc(t *testing.T) {
++	priv, _ := GenerateKey(rand.Reader)
++	var msg = "asdfasdf"
++
++	enc, err := Encrypt(rand.Reader, []byte(msg), &priv.PublicKey)
++	if err != nil {
++		t.Fatalf("encrypt failed : %s", err.Error())
++	}
++	dec,err := Decrypt(enc, priv)
++	if err != nil {
++		t.Fatalf("dec failed : %s", err.Error())
++	}
++
++	if !bytes.Equal([]byte(msg), dec){
++		t.Error("enc-dec failed")
++	}
++}
+\ No newline at end of file
+diff --git a/vendor/github.com/flyinox/crypto/sm/sm2/sm2enc.go b/vendor/github.com/flyinox/crypto/sm/sm2/sm2enc.go
+new file mode 100644
+index 000000000..899f3e74f
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/sm/sm2/sm2enc.go
+@@ -0,0 +1,168 @@
++// Copyright 2011 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Package sm2 implements china crypto standards.
++package sm2
++
++import (
++	"bytes"
++	"crypto/elliptic"
++	"encoding/asn1"
++	"io"
++	"math"
++	"errors"
++	"github.com/flyinox/crypto/sm/sm3"
++	"math/big"
++)
++
++//sm2 enc structure in asn1
++type EncData struct {
++	X *big.Int
++	Y *big.Int
++	Hash []byte
++	C2  []byte
++}
++
++var EncryptionErr = errors.New("sm2: encryption error")
++var DecryptionErr = errors.New("sm2: decryption error")
++
++func keyDerivation(Z []byte, klen int) []byte{
++	var ct  = 1
++	if klen%8 != 0 {
++		return nil
++	}
++
++	K := make([]byte, int(math.Ceil(float64(klen)/(sm3.Size*8))*sm3.Size))
++	v := sm3.Size * 8
++
++	l := int(math.Ceil(float64(klen)/float64(v)))
++
++	var m = make([]byte, len(Z) + 4)
++	var vBytes = make([]byte, 4)
++	copy(m, Z)
++
++	for ;ct<=l;ct++ {
++		vBytes[0] = uint8(ct>>24)
++		vBytes[1] = uint8(ct>>16)
++		vBytes[2] = uint8(ct>>8)
++		vBytes[3] = uint8(ct)
++		copy(m[len(Z):], vBytes)
++
++		hash :=sm3.SumSM3(m)
++		copy(K[(ct-1)*sm3.Size:],hash[:])
++	}
++	return K[:klen/8]
++}
++
++func Encrypt(rand io.Reader, key *PublicKey, msg []byte) (der []byte, err error) {
++	x,y,c2,c3,err := doEncrypt(rand, key, msg)
++	if err != nil {
++		return nil, err
++	}
++	ret := EncData{
++		X:x,
++		Y:y,
++		C2: c2,
++		Hash:c3,
++	}
++
++	return asn1.Marshal(ret)
++}
++
++func doEncrypt(rand io.Reader, key *PublicKey, msg[]byte,) (x,y *big.Int,c2, c3 []byte, err error) {
++	k := generateRandK(rand, key.Curve)
++
++regen:
++	x1, y1 := key.Curve.ScalarBaseMult(k.Bytes())
++	//c1 := elliptic.Marshal(key.Curve, x1, y1)
++	//sx,sy := key.Curve.ScalarMult(key.X, key.Y, k.Bytes())
++	//if sx.Cmp(big.NewInt(0)) == 0 && sy.Cmp(big.NewInt(0)) == 0 {
++	//	return nil, EncryptionErr
++	//}
++
++	x2,y2 := key.Curve.ScalarMult(key.X, key.Y, k.Bytes())
++	Z := make([]byte, len(x2.Bytes())+len(y2.Bytes()))
++	copy(Z, x2.Bytes())
++	copy(Z[len(x2.Bytes()):], y2.Bytes())
++
++	t := keyDerivation(Z, len(msg)*8)
++	if t == nil {
++		return nil,nil,nil, nil, EncryptionErr
++	}
++	for i,v := range t {
++		if v != 0 {
++			break
++		}
++		if i == len(t) - 1 {
++			goto regen
++		}
++	}
++
++	//M^t
++	for i,v := range t {
++		t[i] = v ^ msg[i]
++	}
++
++	m3 := make([]byte, len(x2.Bytes()) + len(y2.Bytes()) + len(msg))
++	copy(m3, x2.Bytes())
++	copy(m3[len(x2.Bytes()):], msg)
++	copy(m3[len(x2.Bytes()) + len(msg):], y2.Bytes())
++
++	c3 = sm3.SumSM3(m3)
++
++	//ret := make([]byte, len(c1) + len(t) + len(c3))
++	//copy(ret, c1)
++	//copy(ret[len(c1):], c3[:])
++	//copy(ret[len(c1) + len(c3):], t)
++	return x1, y1, t, c3, nil
++}
++
++
++func Decrypt(c []byte, key *PrivateKey) ([]byte, error) {
++	c1Len := 1 + 2*((key.Curve.Params().BitSize + 7) >> 3)
++	klen := (len(c) - c1Len - sm3.Size)*8
++
++	x1, y1 := elliptic.Unmarshal(key.Curve, c[:c1Len])
++	if x1 == nil {
++		return nil, DecryptionErr
++	}
++
++	//dB*C1
++	x2,y2 := key.Curve.ScalarMult(x1, y1, key.D.Bytes())
++
++	Z := make([]byte, len(x2.Bytes())+len(y2.Bytes()))
++	copy(Z, x2.Bytes())
++	copy(Z[len(x2.Bytes()):], y2.Bytes())
++
++	t := keyDerivation(Z, klen)
++	if t == nil {
++		return nil, EncryptionErr
++	}
++	for i,v := range t {
++		if v != 0 {
++			break
++		}
++		if i == len(t) - 1 {
++			return nil, DecryptionErr
++		}
++	}
++
++	// m` = c2 ^ t
++	c2 := c[len(c)-(klen/8):]
++	for i,v := range t {
++		t[i] = v ^ c2[i]
++	}
++
++	//validate
++	_u := make([]byte, len(x2.Bytes()) + len(y2.Bytes()) + len(t))
++	copy(_u, x2.Bytes())
++	copy(_u[len(x2.Bytes()):], t)
++	copy(_u[len(x2.Bytes())+ len(t):], y2.Bytes())
++	u := sm3.SumSM3(_u)
++	if !bytes.Equal(u[:], c[c1Len : len(c) - klen/8]){
++		return nil, DecryptionErr
++	}
++
++	return t,nil
++}
+\ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm3/sm3.go b/vendor/github.com/flyinox/crypto/sm/sm3/sm3.go
 new file mode 100644
-index 000000000..f823ed167
+index 000000000..a594d32c2
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm3/sm3.go
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,149 @@
 +// Copyright 2011 The Go Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style
 +// license that can be found in the LICENSE file.
@@ -5212,11 +5859,11 @@ index 000000000..f823ed167
 +var hashFunc func() hash.Hash
 +
 +func init() {
-+	//crypto.RegisterHash(crypto.SM3, New)
++	//crypto.RegisterHash(crypto.tjSM3, New)
 +	hashFunc = New
 +}
 +
-+// The size of a SHA256 checksum in bytes.
++// The size of a SM2 checksum in bytes.
 +const Size = 32
 +
 +// The blocksize of SHA256 and SHA224 in bytes.
@@ -5303,7 +5950,11 @@ index 000000000..f823ed167
 +	return append(in, hash[:]...)
 +}
 +
-+func (d *digest) checkSum() [Size]byte {
++func (d0 *digest)ConstantTimeSum(b []byte) []byte {
++	return d0.Sum(b)
++}
++
++func (d *digest) checkSum() []byte {
 +	len := d.len
 +	// Padding. Add a 1 bit and 0 bits until 56 bytes mod 64.
 +	var tmp [64]byte
@@ -5327,7 +5978,7 @@ index 000000000..f823ed167
 +
 +	h := d.h[:]
 +
-+	var digest [Size]byte
++	var digest []byte = make([]byte, Size)
 +	for i, s := range h {
 +		digest[i*4] = byte(s >> 24)
 +		digest[i*4+1] = byte(s >> 16)
@@ -5335,18 +5986,18 @@ index 000000000..f823ed167
 +		digest[i*4+3] = byte(s)
 +	}
 +	return digest
-+
 +}
 +
-+func SumSM3(data []byte) [Size]byte {
++func SumSM3(data []byte) []byte {
 +	var d digest
 +	d.Reset()
 +	d.Write(data)
 +	return d.checkSum()
 +}
+\ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm3/sm3_test.go b/vendor/github.com/flyinox/crypto/sm/sm3/sm3_test.go
 new file mode 100644
-index 000000000..c6f0ef353
+index 000000000..f61f6ce7c
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm3/sm3_test.go
 @@ -0,0 +1,83 @@
@@ -5383,7 +6034,7 @@ index 000000000..c6f0ef353
 +		g := golden[i]
 +		s := fmt.Sprintf("%x", SumSM3([]byte(g.in)))
 +		if s != g.out {
-+			t.Fatalf("SumSM3 function: SM3(%s) = %s want %s", g.in, s, g.out)
++			t.Fatalf("SumSM3 function: tjSM3(%s) = %s want %s", g.in, s, g.out)
 +		}
 +	}
 +}
@@ -5433,9 +6084,10 @@ index 000000000..c6f0ef353
 +func BenchmarkHash8K(b *testing.B) {
 +	benchmarkSize(b, 8192)
 +}
+\ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm3/sm3hash.go b/vendor/github.com/flyinox/crypto/sm/sm3/sm3hash.go
 new file mode 100644
-index 000000000..fb8aa48a2
+index 000000000..4a7a05dfc
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm3/sm3hash.go
 @@ -0,0 +1,172 @@
@@ -5611,12 +6263,212 @@ index 000000000..fb8aa48a2
 +		dig.h[i] = V[i]
 +	}
 +}
+\ No newline at end of file
+diff --git a/vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go b/vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go
+new file mode 100644
+index 000000000..da07e0928
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go
+@@ -0,0 +1,72 @@
++// Copyright 2011 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Package sm3 implements china crypto standards.
++package sm3
++
++import (
++	"github.com/flyinox/crypto/sm/sm2"
++	"hash"
++)
++
++const DEFAULT_USER_ID = "1234567812345678"
++
++//
++type sm3sig struct {
++	digest
++	pub *sm2.PublicKey
++	msg []byte
++}
++
++func NewSM3Sig(pub *sm2.PublicKey) hash.Hash {
++	d := new(sm3sig)
++	d.pub = pub
++	d.Reset()
++	return d
++}
++
++func (sm3 *sm3sig) Write(p []byte) (nn int, err error) {
++	sm3.msg = append(sm3.msg, p)
++	return len(sm3.msg), nil
++}
++
++func (sm3 *sm3sig) Sum(in []byte) []byte {
++	if in != nil {
++		panic("sm3sig sum: in must be nil")
++	}
++
++	sm3.digest.Write(sm3.msg)
++	return append(getZ(sm3.pub), sm3.msg...)
++}
++
++func (sm3 *sm3sig)ConstantTimeSum(b []byte) []byte {
++	return sm3.Sum(b)
++}
++
++func SumSM3Sig(pub *sm2.PublicKey ,data []byte) []byte {
++	var d = NewSM3Sig(pub)
++	d.Reset()
++	d.Write(data)
++	return d.Sum(nil)
++}
++
++func getZById(pub *sm2.PublicKey, id []byte) []byte{
++	var lena = uint16(len(id) * 8) //bit len of IDA
++	var ENTLa = []byte{byte(lena>>8), byte(lena)}
++	var z = make([]byte, 0, 1024)
++
++	z = append(z, ENTLa...)
++	z = append(z, id...)
++	z = append(z, sm2.SM2PARAM_A.Bytes()...)
++	z = append(z, sm2.P256Sm2().Params().B.Bytes()...)
++	z = append(z, sm2.P256Sm2().Params().Gx.Bytes()...)
++	z = append(z, sm2.P256Sm2().Params().Gy.Bytes()...)
++	z = append(z, pub.X.Bytes()...)
++	z = append(z, pub.Y.Bytes()...)
++	return SumSM3(z)
++}
++//Za = sm3(ENTL||IDa||a||b||Gx||Gy||Xa||Xy)
++func getZ(pub *sm2.PublicKey) []byte {
++	return getZById(pub, []byte(DEFAULT_USER_ID))
++}
+\ No newline at end of file
+diff --git a/vendor/github.com/flyinox/crypto/sm/sm4/cipher.go b/vendor/github.com/flyinox/crypto/sm/sm4/cipher.go
+new file mode 100644
+index 000000000..309bf1dd2
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/sm/sm4/cipher.go
+@@ -0,0 +1,42 @@
++package sm4
++
++import (
++	"crypto/cipher"
++	"strconv"
++)
++
++type sm4Cipher struct{
++	enc []uint32
++	dec []uint32
++}
++
++type KeySizeError int
++
++func (k KeySizeError) Error() string {
++	return "crypto/sm4: invalid key size " + strconv.Itoa(int(k))
++}
++
++func NewCipher(key []byte) (cipher.Block,error){
++	k := len(key)
++	if k != BlockSize{
++		return nil, KeySizeError(k)
++	}
++	cipher :=  &sm4Cipher{
++		enc: make([]uint32, 32),
++		dec: make([]uint32, 32),
++	}
++	expandKey(key, cipher.enc, cipher.dec)
++	return cipher,nil
++}
++
++func (c *sm4Cipher) BlockSize() int {
++	return BlockSize
++}
++
++func (c *sm4Cipher) Encrypt(dst, src []byte) {
++	encryptBlock(c.enc, dst, src)
++}
++
++func (c *sm4Cipher) Decrypt(dst, src []byte) {
++	encryptBlock(c.dec, dst, src)
++}
+\ No newline at end of file
+diff --git a/vendor/github.com/flyinox/crypto/sm/sm4/cipher_test.go b/vendor/github.com/flyinox/crypto/sm/sm4/cipher_test.go
+new file mode 100644
+index 000000000..6ff16e89d
+--- /dev/null
++++ b/vendor/github.com/flyinox/crypto/sm/sm4/cipher_test.go
+@@ -0,0 +1,65 @@
++package sm4
++
++import (
++	"bytes"
++	"fmt"
++	"log"
++	"testing"
++)
++
++func TestBlockBase(t *testing.T){
++	var tests = []struct{
++		key []byte
++		msg []byte
++		want []byte
++		isEnc bool
++	}{
++		{
++			key:[]byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10},
++			msg:[]byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10},
++			want: []byte{0x68,0x1E,0xDF,0x34,0xD2,0x06,0x96,0x5E,0x86,0xB3,0xE9,0x4F,0x53,0x6E,0x42,0x46},
++			isEnc: true,
++		},
++		{
++			key:[]byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10},
++			msg:[]byte{0x68,0x1E,0xDF,0x34,0xD2,0x06,0x96,0x5E,0x86,0xB3,0xE9,0x4F,0x53,0x6E,0x42,0x46},
++			want:[]byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10},
++			isEnc: false,
++		},
++	}
++	for _, test:= range tests{
++		block,err := NewCipher(test.key)
++		if err != nil {
++			t.Errorf("new cipher failed:%s\n", err.Error())
++			continue
++		}
++		dst := make([]byte, 16)
++		if test.isEnc{
++			block.Encrypt(dst, test.msg)
++		}else{
++			block.Decrypt(dst, test.msg)
++		}
++		if !bytes.Equal(test.want, dst){
++			t.Errorf("TestBlockBase failed:\n key:%v\n msg:%v\n want:%v\n actual:%v\n", test.key, test.msg, test.want, dst)
++		}
++	}
++}
++
++
++func TestSM4(t *testing.T) {
++	key := []byte("1234567890abcdef")
++	fmt.Printf("key = %v\n", key)
++	data := []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10}
++	fmt.Printf("key = %v\n", key)
++	fmt.Printf("data = %x\n", data)
++	c, err := NewCipher(key)
++	if err != nil {
++		log.Fatal(err)
++	}
++	d0 := make([]byte, 16)
++	c.Encrypt(d0, data)
++	fmt.Printf("d0 = %x\n", d0)
++	d1 := make([]byte, 16)
++	c.Decrypt(d1, d0)
++	fmt.Printf("d1 = %x\n", d1)
++}
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm4/sm4.go b/vendor/github.com/flyinox/crypto/sm/sm4/sm4.go
 new file mode 100644
-index 000000000..8cc51b2c3
+index 000000000..6c3ce1fe6
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/sm/sm4/sm4.go
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,125 @@
 +/*
 +// Copyright 2017 cetc-30. All rights reserved.
 +// Use of this source code is governed by a BSD-style
@@ -5626,10 +6478,7 @@ index 000000000..8cc51b2c3
 +*/
 +package sm4
 +
-+import (
-+	"bytes"
-+	"errors"
-+)
++import "github.com/flyinox/crypto/internal/subtle"
 +
 +type cryptMode int
 +
@@ -5642,8 +6491,7 @@ index 000000000..8cc51b2c3
 +
 +var sbox = [16][16]byte{
 +	{0xd6, 0x90, 0xe9, 0xfe, 0xcc, 0xe1, 0x3d, 0xb7, 0x16, 0xb6, 0x14, 0xc2, 0x28, 0xfb, 0x2c, 0x05},
-+	{0x2b, 0x67, 0x9a, 0x76, 0x2a, 0xbe, 0x04, 0xc3, 0xaa, 0x44, 0x13, 0x26, 0x49, 0x86, 0x06, 0x99},
-+	{0x9c, 0x42, 0x50, 0xf4, 0x91, 0xef, 0x98, 0x7a, 0x33, 0x54, 0x0b, 0x43, 0xed, 0xcf, 0xac, 0x62},
++	{0x2b, 0x67, 0x9a, 0x76, 0x2a, 0xbe, 0x04, 0xc3, 0xaa, 0x44, 0x13, 0x26, 0x49, 0x86, 0x06, 0x99}, {0x9c, 0x42, 0x50, 0xf4, 0x91, 0xef, 0x98, 0x7a, 0x33, 0x54, 0x0b, 0x43, 0xed, 0xcf, 0xac, 0x62},
 +	{0xe4, 0xb3, 0x1c, 0xa9, 0xc9, 0x08, 0xe8, 0x95, 0x80, 0xdf, 0x94, 0xfa, 0x75, 0x8f, 0x3f, 0xa6},
 +	{0x47, 0x07, 0xa7, 0xfc, 0xf3, 0x73, 0x17, 0xba, 0x83, 0x59, 0x3c, 0x19, 0xe6, 0x85, 0x4f, 0xa8},
 +	{0x68, 0x6b, 0x81, 0xb2, 0x71, 0x64, 0xda, 0x8b, 0xf8, 0xeb, 0x0f, 0x4b, 0x70, 0x56, 0x9d, 0x35},
@@ -5682,10 +6530,7 @@ index 000000000..8cc51b2c3
 +	tmp[1] = byte(in>>16) & 0xff
 +	tmp[2] = byte(in>>8) & 0xff
 +	tmp[3] = byte(in) & 0xff
-+	re = (uint32(scSbox(tmp[3])) |
-+		(uint32(scSbox(tmp[2])) << 8) |
-+		(uint32(scSbox(tmp[1])) << 16) |
-+		(uint32(scSbox(tmp[0])) << 24))
++	re = uint32(scSbox(tmp[3])) | (uint32(scSbox(tmp[2])) << 8) | (uint32(scSbox(tmp[1])) << 16) | (uint32(scSbox(tmp[0])) << 24)
 +	return re
 +}
 +
@@ -5693,176 +6538,63 @@ index 000000000..8cc51b2c3
 +	return in ^ leftRotate(in, 2) ^ leftRotate(in, 10) ^ leftRotate(in, 18) ^ leftRotate(in, 24)
 +}
 +
-+func key_l(in uint32) uint32 {
++func keyL(in uint32) uint32 {
 +	return in ^ leftRotate(in, 13) ^ leftRotate(in, 23)
 +}
 +
 +func t3(in uint32) uint32 {
 +	return l(tt(in))
 +}
-+func key_t(in uint32) uint32 {
-+	return key_l(tt(in))
++func keyT(in uint32) uint32 {
++	return keyL(tt(in))
 +}
 +
-+func keyExp(key [4]uint32) [32]uint32 {
++
++func leftRotate(x uint32, r uint32) uint32 {
++	return ((x) << r) | ((x) >> (32 - r))
++}
++
++func expandKey(key []byte, enc, dec []uint32){
 +	var k [36]uint32
-+	var rk [32]uint32
 +	for i := 0; i < 4; i++ {
-+		k[i] = key[i] ^ fk[i]
++		k[i] = uint32(uint32(key[4*i])<<24 | uint32(key[4*i+1])<<16 | uint32(key[4*i+2]) << 8 | uint32(key[4*i+3])) ^ fk[i]
 +	}
 +	for i := 0; i < 32; i++ {
-+		k[i+4] = k[i] ^ key_t(k[i+1]^k[i+2]^k[i+3]^ck[i])
-+		rk[i] = k[i+4]
++		k[i+4] = k[i] ^ keyT(k[i+1]^k[i+2]^k[i+3]^ck[i])
++		enc[i] = k[i+4]
++		dec[32-i-1] = k[i+4]
 +	}
-+	return rk
 +}
 +
-+func encrypt_oneround(rk [32]uint32, msg []byte) []byte {
++func encryptBlock(rk []uint32, dst,src []byte){
++	if len(dst) < BlockSize{
++		panic("crypto/sm4: output not full block")
++	}
++	if len(src) < BlockSize{
++		panic("crypto/sm4: input not full block")
++	}
++	if subtle.InexactOverlap(dst[:BlockSize], src[:BlockSize]) {
++		panic("crypto/aes: invalid buffer overlap")
++	}
++
 +	var x [36]uint32
-+	var cipher = make([]byte, 16)
 +	for i := 0; i < 4; i++ {
-+		x[i] = (uint32(msg[i*4+3])) |
-+			(uint32(msg[i*4+2]) << 8) |
-+			(uint32(msg[i*4+1]) << 16) |
-+			(uint32(msg[i*4]) << 24)
++		x[i] = (uint32(src[i*4+3])) |
++			(uint32(src[i*4+2]) << 8) |
++			(uint32(src[i*4+1]) << 16) |
++			(uint32(src[i*4]) << 24)
 +	}
 +	for i := 0; i < 32; i++ {
 +		x[i+4] = x[i] ^ t3(x[i+1]^x[i+2]^x[i+3]^rk[i])
 +	}
 +	for i := 0; i < 4; i++ {
-+		cipher[i*4] = byte(x[35-i]>>24) & 0xff
-+		cipher[i*4+1] = byte(x[35-i]>>16) & 0xff
-+		cipher[i*4+2] = byte(x[35-i]>>8) & 0xff
-+		cipher[i*4+3] = byte(x[35-i]) & 0xff
-+	}
-+	return cipher
-+}
-+
-+func rk_swap(rk [32]uint32) [32]uint32 {
-+	var tmp uint32
-+	for i := 0; i < 16; i++ {
-+		tmp = rk[i]
-+		rk[i] = rk[31-i]
-+		rk[31-i] = tmp
-+	}
-+	return rk
-+}
-+
-+func pkcs7Padding(src []byte) []byte {
-+	padding := BlockSize - len(src)%BlockSize
-+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-+	return append(src, padtext...)
-+}
-+
-+func pkcs7UnPadding(src []byte) ([]byte, error) {
-+	length := len(src)
-+	unpadding := int(src[length-1])
-+
-+	if unpadding > BlockSize || unpadding == 0 {
-+		return nil, errors.New("Invalid pkcs7 padding (unpadding > BlockSize || unpadding == 0)")
-+	}
-+
-+	pad := src[len(src)-unpadding:]
-+	for i := 0; i < unpadding; i++ {
-+		if pad[i] != byte(unpadding) {
-+			return nil, errors.New("Invalid pkcs7 padding (pad[i] != unpadding)")
-+		}
-+	}
-+
-+	return src[:(length - unpadding)], nil
-+}
-+
-+func Sm4Ecb(key []byte, msg []byte, mode cryptMode) []byte {
-+	var inData []byte
-+	if mode == ENC {
-+		inData = pkcs7Padding(msg)
-+	} else {
-+		inData = msg
-+	}
-+	var key_u32 [4]uint32
-+	cipher := make([]byte, len(inData))
-+	for i := 0; i < 4; i++ {
-+		key_u32[i] = (uint32(key[i*4+3])) |
-+			(uint32(key[i*4+2]) << 8) |
-+			(uint32(key[i*4+1]) << 16) |
-+			(uint32(key[i*4]) << 24)
-+	}
-+	var rk [32]uint32
-+	rk = keyExp(key_u32)
-+	if mode == DEC {
-+		rk = rk_swap(rk)
-+	}
-+	for i := 0; i < len(inData)/16; i++ {
-+		msg_tmp := inData[i*16 : i*16+16]
-+		cipher_tmp := encrypt_oneround(rk, msg_tmp)
-+		copy(cipher[i*16:i*16+16], cipher_tmp)
-+	}
-+	if mode == DEC {
-+		cipher, _ = pkcs7UnPadding(cipher)
-+	}
-+	return cipher
-+}
-+
-+func leftRotate(x uint32, r int) uint32 {
-+	var rr uint32 = uint32(r)
-+	return ((x << rr) | (x >> (32 - rr))) & 0xffffffff
-+}
-diff --git a/vendor/github.com/flyinox/crypto/sm/sm4/sm4_test.go b/vendor/github.com/flyinox/crypto/sm/sm4/sm4_test.go
-new file mode 100644
-index 000000000..20fce5e2b
---- /dev/null
-+++ b/vendor/github.com/flyinox/crypto/sm/sm4/sm4_test.go
-@@ -0,0 +1,50 @@
-+/*
-+// Copyright 2017 cetc-30. All rights reserved.
-+// Use of this source code is governed by a BSD-style
-+// license that can be found in the LICENSE file.
-+
-+// Package china crypto algorithm implements the sm2, sm3, sm4 algorithms
-+*/
-+package sm4
-+
-+import (
-+	"bytes"
-+	"testing"
-+)
-+
-+func TestEncAndDec(t *testing.T) {
-+	key := []byte("1234567890abcdef")
-+	msg := []byte("this is a test")
-+	encMsg := Sm4Ecb(key, msg, ENC)
-+	dec := Sm4Ecb(key, encMsg, DEC)
-+	if !bytes.Equal(msg, dec) {
-+		t.Errorf("sm4 self enc and dec failed")
++		dst[i*4] = byte(x[35-i]>>24)
++		dst[i*4+1] = byte(x[35-i]>>16)
++		dst[i*4+2] = byte(x[35-i]>>8)
++		dst[i*4+3] = byte(x[35-i])
 +	}
 +}
-+
-+var buf = make([]byte, 8192)
-+
-+func BenchmarkSm4Ecb(b *testing.B) {
-+	b.SetBytes(8)
-+
-+}
-+
-+func benchmarkSize(b *testing.B, size int) {
-+	b.SetBytes(int64(size))
-+	key := []byte("1234567890abcdef")
-+	for i := 0; i < b.N; i++ {
-+		Sm4Ecb(key, buf[:size], ENC)
-+	}
-+}
-+
-+func BenchmarkSm4Ecb8Bytes(b *testing.B) {
-+	benchmarkSize(b, 8)
-+}
-+
-+func BenchmarkSm4Ecb1K(b *testing.B) {
-+	benchmarkSize(b, 1024)
-+}
-+
-+func BenchmarkSm4Ecb8K(b *testing.B) {
-+	benchmarkSize(b, 8192)
-+}
+\ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/x509/cert_pool.go b/vendor/github.com/flyinox/crypto/x509/cert_pool.go
 new file mode 100644
 index 000000000..a1646b982
@@ -6041,7 +6773,7 @@ index 000000000..a1646b982
 +}
 diff --git a/vendor/github.com/flyinox/crypto/x509/example_test.go b/vendor/github.com/flyinox/crypto/x509/example_test.go
 new file mode 100644
-index 000000000..97c2ea244
+index 000000000..656a377fa
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/x509/example_test.go
 @@ -0,0 +1,134 @@
@@ -6049,7 +6781,7 @@ index 000000000..97c2ea244
 +// Use of this source code is governed by a BSD-style
 +// license that can be found in the LICENSE file.
 +
-+package x509_test
++package x509
 +
 +import (
 +	"crypto/dsa"
@@ -7463,7 +8195,7 @@ index 000000000..bc35a1cf2
 +}
 diff --git a/vendor/github.com/flyinox/crypto/x509/root_darwin_arm_gen.go b/vendor/github.com/flyinox/crypto/x509/root_darwin_arm_gen.go
 new file mode 100644
-index 000000000..fc2488adc
+index 000000000..a374f086b
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/x509/root_darwin_arm_gen.go
 @@ -0,0 +1,192 @@
@@ -7483,7 +8215,7 @@ index 000000000..fc2488adc
 +// Apple publishes the list of trusted root certificates for iOS on
 +// support.apple.com. So we parse the list and extract the certificates from
 +// an OS X machine and embed them into the x509 package.
-+package main
++package x509
 +
 +import (
 +	"bytes"
@@ -15824,10 +16556,10 @@ index 000000000..41e295d3e
 +-----END CERTIFICATE-----`
 diff --git a/vendor/github.com/flyinox/crypto/x509/x509.go b/vendor/github.com/flyinox/crypto/x509/x509.go
 new file mode 100644
-index 000000000..f6c437794
+index 000000000..ac7139688
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/x509/x509.go
-@@ -0,0 +1,2395 @@
+@@ -0,0 +1,2421 @@
 +// Copyright 2009 The Go Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style
 +// license that can be found in the LICENSE file.
@@ -15946,6 +16678,7 @@ index 000000000..f6c437794
 +	}
 +
 +	return publicKeyBytes, publicKeyAlgorithm, nil
++
 +}
 +
 +// MarshalPKIXPublicKey serialises a public key to DER-encoded PKIX format.
@@ -16069,7 +16802,7 @@ index 000000000..f6c437794
 +	ECDSAWithSHA256:  "ECDSA-SHA256",
 +	ECDSAWithSHA384:  "ECDSA-SHA384",
 +	ECDSAWithSHA512:  "ECDSA-SHA512",
-+	SM2WithSM3:       "SM2-SM3",
++	SM2WithSM3:       "SM2-tjSM3",
 +	SM2WithSHA1:      "SM2-SHA1",
 +	SM2WithSHA256:    "SM2-SHA256",
 +}
@@ -16746,7 +17479,7 @@ index 000000000..f6c437794
 +		if sm2Sig.R.Sign() <= 0 || sm2Sig.S.Sign() <= 0 {
 +			return errors.New("x509: sm2 signature contained zero or negative values")
 +		}
-+		if !sm2.Verify(pub, digest, sm2Sig.R, sm2Sig.S) {
++		if !sm2.Verify(pub, signed, sm2Sig.R, sm2Sig.S) {
 +			return errors.New("x509: sm2 verification failure")
 +		}
 +
@@ -17600,7 +18333,7 @@ index 000000000..f6c437794
 +		pubType = SM2
 +		switch pub.Curve {
 +		case sm2.P256Sm2():
-+			//hashFunc = SM3
++			//hashFunc = tjSM3
 +			hashFunc = 255
 +			sigAlgo.Algorithm = oidSignatureSM2WithSM3
 +			//hashFunc = crypto.SHA256
@@ -17768,9 +18501,17 @@ index 000000000..f6c437794
 +	}
 +
 +	var signature []byte
-+	signature, err = key.Sign(rand, digest, signerOpts)
-+	if err != nil {
-+		return
++	switch key.Public().(type) {
++	case *sm2.PublicKey:
++		signature, err = key.Sign(rand, tbsCertContents, signerOpts)
++		if err != nil {
++			return
++		}
++	default:
++		signature, err = key.Sign(rand, digest, signerOpts)
++		if err != nil {
++			return
++		}
 +	}
 +
 +	return asn1.Marshal(certificate{
@@ -17863,9 +18604,17 @@ index 000000000..f6c437794
 +	digest := h.Sum(nil)
 +
 +	var signature []byte
-+	signature, err = key.Sign(rand, digest, hashFunc)
-+	if err != nil {
-+		return
++	switch key.(type) {
++	case *sm2.PrivateKey:
++		signature, err = key.Sign(rand, tbsCertListContents, hashFunc)
++		if err != nil {
++			return
++		}
++	default:
++		signature, err = key.Sign(rand, digest, hashFunc)
++		if err != nil {
++			return
++		}
 +	}
 +
 +	return asn1.Marshal(pkix.CertificateList{
@@ -18137,15 +18886,24 @@ index 000000000..f6c437794
 +	}
 +	tbsCSR.Raw = tbsCSRContents
 +
-+	h := hashFunc.New()
-+	h.Write(tbsCSRContents)
-+	digest := h.Sum(nil)
 +
 +	var signature []byte
-+	signature, err = key.Sign(rand, digest, hashFunc)
-+	if err != nil {
-+		return
++	switch key.(type) {
++	case *sm2.PrivateKey:
++		signature, err = key.Sign(rand, tbsCSRContents, hashFunc)
++		if err != nil {
++			return
++		}
++	default:
++		h := hashFunc.New()
++		h.Write(tbsCSRContents)
++		digest := h.Sum(nil)
++		signature, err = key.Sign(rand, digest, hashFunc)
++		if err != nil {
++			return
++		}
 +	}
++
 +
 +	return asn1.Marshal(certificateRequest{
 +		TBSCSR:             tbsCSR,
@@ -18225,7 +18983,7 @@ index 000000000..f6c437794
 +}
 diff --git a/vendor/github.com/flyinox/crypto/x509/x509_test.go b/vendor/github.com/flyinox/crypto/x509/x509_test.go
 new file mode 100644
-index 000000000..b800191db
+index 000000000..a055ccf3d
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/x509/x509_test.go
 @@ -0,0 +1,1425 @@
@@ -18625,7 +19383,7 @@ index 000000000..b800191db
 +			UnknownExtKeyUsage: testUnknownExtKeyUsage,
 +
 +			BasicConstraintsValid: true,
-+			IsCA: true,
++			IsCA:                  true,
 +
 +			OCSPServer:            []string{"http://ocsp.example.com"},
 +			IssuingCertificateURL: []string{"http://crt.example.com/ca1.crt"},
@@ -19392,7 +20150,7 @@ index 000000000..b800191db
 +		NotAfter:  time.Unix(100000, 0),
 +
 +		BasicConstraintsValid: true,
-+		IsCA: true,
++		IsCA:                  true,
 +	}
 +
 +	cert1 := serialiseAndParse(t, template)
@@ -19433,8 +20191,8 @@ index 000000000..b800191db
 +		NotAfter:  time.Unix(100000, 0),
 +
 +		BasicConstraintsValid: true,
-+		IsCA:         true,
-+		SubjectKeyId: []byte{1, 2, 3, 4},
++		IsCA:                  true,
++		SubjectKeyId:          []byte{1, 2, 3, 4},
 +	}
 +
 +	if cert := serialiseAndParse(t, template); len(cert.AuthorityKeyId) != 0 {
@@ -19656,7 +20414,7 @@ index 000000000..b800191db
 +}
 diff --git a/vendor/github.com/flyinox/crypto/x509/x509_test_import.go b/vendor/github.com/flyinox/crypto/x509/x509_test_import.go
 new file mode 100644
-index 000000000..3fda7da18
+index 000000000..efd117a74
 --- /dev/null
 +++ b/vendor/github.com/flyinox/crypto/x509/x509_test_import.go
 @@ -0,0 +1,53 @@
@@ -19669,7 +20427,7 @@ index 000000000..3fda7da18
 +// This file is run by the x509 tests to ensure that a program with minimal
 +// imports can sign certificates without errors resulting from missing hash
 +// functions.
-+package main
++package x509
 +
 +import (
 +	"crypto/rand"
