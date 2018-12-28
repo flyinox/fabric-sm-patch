@@ -1,4 +1,4 @@
-From 4ef326ac440185af3563fa239bda6a4806828583 Mon Sep 17 00:00:00 2001
+From a5cbf4c990b8d4dbf92bba9c415d2e0829222a59 Mon Sep 17 00:00:00 2001
 From: Dijun Liu <flyinox31@gmail.com>
 Date: Wed, 7 Nov 2018 11:48:02 +0800
 Subject: [PATCH] China crypto standards support
@@ -46,7 +46,6 @@ Subject: [PATCH] China crypto standards support
  .../github.com/flyinox/crypto/sm/sm3/sm3.go   |  149 +
  .../flyinox/crypto/sm/sm3/sm3_test.go         |   83 +
  .../flyinox/crypto/sm/sm3/sm3hash.go          |  172 +
- .../flyinox/crypto/sm/sm3/sm3sig.go           |   72 +
  .../flyinox/crypto/sm/sm4/cipher.go           |   42 +
  .../flyinox/crypto/sm/sm4/cipher_test.go      |   65 +
  .../github.com/flyinox/crypto/sm/sm4/sm4.go   |  125 +
@@ -81,7 +80,7 @@ Subject: [PATCH] China crypto standards support
  vendor/github.com/flyinox/crypto/x509/x509.go | 2421 ++++++++
  .../flyinox/crypto/x509/x509_test.go          | 1425 +++++
  .../flyinox/crypto/x509/x509_test_import.go   |   53 +
- 77 files changed, 19712 insertions(+), 14 deletions(-)
+ 76 files changed, 19640 insertions(+), 14 deletions(-)
  create mode 100644 bccsp/factory/gmfactory.go
  create mode 100644 bccsp/gm/fileks.go
  create mode 100644 bccsp/gm/impl.go
@@ -110,7 +109,6 @@ Subject: [PATCH] China crypto standards support
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3hash.go
- create mode 100644 vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/cipher.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/cipher_test.go
  create mode 100644 vendor/github.com/flyinox/crypto/sm/sm4/sm4.go
@@ -6262,85 +6260,6 @@ index 000000000..4a7a05dfc
 +	for i := 0; i < 8; i++ {
 +		dig.h[i] = V[i]
 +	}
-+}
-\ No newline at end of file
-diff --git a/vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go b/vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go
-new file mode 100644
-index 000000000..da07e0928
---- /dev/null
-+++ b/vendor/github.com/flyinox/crypto/sm/sm3/sm3sig.go
-@@ -0,0 +1,72 @@
-+// Copyright 2011 The Go Authors. All rights reserved.
-+// Use of this source code is governed by a BSD-style
-+// license that can be found in the LICENSE file.
-+
-+// Package sm3 implements china crypto standards.
-+package sm3
-+
-+import (
-+	"github.com/flyinox/crypto/sm/sm2"
-+	"hash"
-+)
-+
-+const DEFAULT_USER_ID = "1234567812345678"
-+
-+//
-+type sm3sig struct {
-+	digest
-+	pub *sm2.PublicKey
-+	msg []byte
-+}
-+
-+func NewSM3Sig(pub *sm2.PublicKey) hash.Hash {
-+	d := new(sm3sig)
-+	d.pub = pub
-+	d.Reset()
-+	return d
-+}
-+
-+func (sm3 *sm3sig) Write(p []byte) (nn int, err error) {
-+	sm3.msg = append(sm3.msg, p)
-+	return len(sm3.msg), nil
-+}
-+
-+func (sm3 *sm3sig) Sum(in []byte) []byte {
-+	if in != nil {
-+		panic("sm3sig sum: in must be nil")
-+	}
-+
-+	sm3.digest.Write(sm3.msg)
-+	return append(getZ(sm3.pub), sm3.msg...)
-+}
-+
-+func (sm3 *sm3sig)ConstantTimeSum(b []byte) []byte {
-+	return sm3.Sum(b)
-+}
-+
-+func SumSM3Sig(pub *sm2.PublicKey ,data []byte) []byte {
-+	var d = NewSM3Sig(pub)
-+	d.Reset()
-+	d.Write(data)
-+	return d.Sum(nil)
-+}
-+
-+func getZById(pub *sm2.PublicKey, id []byte) []byte{
-+	var lena = uint16(len(id) * 8) //bit len of IDA
-+	var ENTLa = []byte{byte(lena>>8), byte(lena)}
-+	var z = make([]byte, 0, 1024)
-+
-+	z = append(z, ENTLa...)
-+	z = append(z, id...)
-+	z = append(z, sm2.SM2PARAM_A.Bytes()...)
-+	z = append(z, sm2.P256Sm2().Params().B.Bytes()...)
-+	z = append(z, sm2.P256Sm2().Params().Gx.Bytes()...)
-+	z = append(z, sm2.P256Sm2().Params().Gy.Bytes()...)
-+	z = append(z, pub.X.Bytes()...)
-+	z = append(z, pub.Y.Bytes()...)
-+	return SumSM3(z)
-+}
-+//Za = sm3(ENTL||IDa||a||b||Gx||Gy||Xa||Xy)
-+func getZ(pub *sm2.PublicKey) []byte {
-+	return getZById(pub, []byte(DEFAULT_USER_ID))
 +}
 \ No newline at end of file
 diff --git a/vendor/github.com/flyinox/crypto/sm/sm4/cipher.go b/vendor/github.com/flyinox/crypto/sm/sm4/cipher.go
