@@ -1,4 +1,4 @@
-From 1abe17cd68db79fd376db4b792f23d497ccf940a Mon Sep 17 00:00:00 2001
+From 1f6742275024bd16ce6ab865c45a0175d182e640 Mon Sep 17 00:00:00 2001
 From: Dijun Liu <flyinox31@gmail.com>
 Date: Wed, 7 Nov 2018 11:48:02 +0800
 Subject: [PATCH] China crypto standards support
@@ -24,7 +24,6 @@ Subject: [PATCH] China crypto standards support
  common/tools/cryptogen/msp/generator.go       |    2 +
  common/tools/cryptogen/msp/generatorsm.go     |  284 +
  core/common/validation/msgvalidation.go       |    2 +-
- docker-env.mk                                 |    2 +-
  msp/cert.go                                   |    3 +-
  msp/identities.go                             |   32 +-
  msp/mspimpl.go                                |    3 +-
@@ -75,7 +74,7 @@ Subject: [PATCH] China crypto standards support
  vendor/github.com/flyinox/crypto/x509/x509.go | 2421 ++++++++
  .../flyinox/crypto/x509/x509_test.go          | 1425 +++++
  .../flyinox/crypto/x509/x509_test_import.go   |   53 +
- 71 files changed, 18248 insertions(+), 14 deletions(-)
+ 70 files changed, 18247 insertions(+), 13 deletions(-)
  create mode 100644 bccsp/factory/gmfactory.go
  create mode 100644 bccsp/gm/fileks.go
  create mode 100644 bccsp/gm/impl.go
@@ -184,19 +183,19 @@ index 000000000..7330a7f74
 +}
 \ No newline at end of file
 diff --git a/bccsp/factory/nopkcs11.go b/bccsp/factory/nopkcs11.go
-index a83695fa6..77125fecf 100644
+index 3e143e13d..64f642127 100644
 --- a/bccsp/factory/nopkcs11.go
 +++ b/bccsp/factory/nopkcs11.go
-@@ -53,7 +53,7 @@ func InitFactories(config *FactoryOpts) error {
+@@ -53,7 +53,7 @@ func initFactories(config *FactoryOpts) error {
  
- 		// Software-Based BCCSP
- 		if config.SwOpts != nil {
--			f := &SWFactory{}
-+			f := &GMFactory{}
- 			err := initBCCSP(f, config)
- 			if err != nil {
- 				factoriesInitError = errors.Wrapf(err, "Failed initializing BCCSP.")
-@@ -84,7 +84,7 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
+ 	// Software-Based BCCSP
+ 	if config.ProviderName == "SW" && config.SwOpts != nil {
+-		f := &SWFactory{}
++		f := &GMFactory{}
+ 		err := initBCCSP(f, config)
+ 		if err != nil {
+ 			return errors.Wrapf(err, "Failed initializing BCCSP")
+@@ -82,7 +82,7 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
  	var f BCCSPFactory
  	switch config.ProviderName {
  	case "SW":
@@ -206,19 +205,19 @@ index a83695fa6..77125fecf 100644
  		f = &PluginFactory{}
  	default:
 diff --git a/bccsp/factory/pkcs11.go b/bccsp/factory/pkcs11.go
-index 4456d70eb..cd8eba27c 100644
+index efef9d2d8..d99e57a63 100644
 --- a/bccsp/factory/pkcs11.go
 +++ b/bccsp/factory/pkcs11.go
-@@ -62,7 +62,7 @@ func setFactories(config *FactoryOpts) error {
+@@ -55,7 +55,7 @@ func initFactories(config *FactoryOpts) error {
  
  	// Software-Based BCCSP
- 	if config.SwOpts != nil {
+ 	if config.ProviderName == "SW" && config.SwOpts != nil {
 -		f := &SWFactory{}
 +		f := &GMFactory{}
  		err := initBCCSP(f, config)
  		if err != nil {
- 			factoriesInitError = errors.Wrap(err, "Failed initializing SW.BCCSP")
-@@ -101,7 +101,7 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
+ 			return errors.Wrap(err, "Failed initializing SW.BCCSP")
+@@ -94,7 +94,7 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
  	var f BCCSPFactory
  	switch config.ProviderName {
  	case "SW":
@@ -2319,7 +2318,7 @@ index 000000000..933f208ab
 +	return ecPubKey, nil
 +}
 diff --git a/common/tools/cryptogen/main.go b/common/tools/cryptogen/main.go
-index f5549f3ef..8d1cb182d 100644
+index a1b5c4161..f16e61e38 100644
 --- a/common/tools/cryptogen/main.go
 +++ b/common/tools/cryptogen/main.go
 @@ -1,3 +1,5 @@
@@ -3054,7 +3053,7 @@ index 000000000..19969014b
 +	}
 +}
 diff --git a/common/tools/cryptogen/msp/generator.go b/common/tools/cryptogen/msp/generator.go
-index baf4f453b..cc73936c4 100644
+index eb9c9c7ce..03774a857 100644
 --- a/common/tools/cryptogen/msp/generator.go
 +++ b/common/tools/cryptogen/msp/generator.go
 @@ -1,3 +1,5 @@
@@ -3354,7 +3353,7 @@ index 000000000..e95261383
 +	return err
 +}
 diff --git a/core/common/validation/msgvalidation.go b/core/common/validation/msgvalidation.go
-index 9cce59ed9..64614588a 100644
+index 3ac5686e1..b4e603563 100644
 --- a/core/common/validation/msgvalidation.go
 +++ b/core/common/validation/msgvalidation.go
 @@ -111,7 +111,7 @@ func ValidateProposalMessage(signedProp *pb.SignedProposal) (*pb.Proposal, *comm
@@ -3366,19 +3365,6 @@ index 9cce59ed9..64614588a 100644
  	}
  
  	// Verify that the transaction ID has been computed properly.
-diff --git a/docker-env.mk b/docker-env.mk
-index 1c5236fb7..7846aabd7 100644
---- a/docker-env.mk
-+++ b/docker-env.mk
-@@ -62,7 +62,7 @@ PREV_TAG=$(ARCH)-$(PREV_VERSION)
- 
- BASE_DOCKER_LABEL=org.hyperledger.fabric
- 
--DOCKER_DYNAMIC_LINK ?= false
-+DOCKER_DYNAMIC_LINK ?= true
- DOCKER_GO_LDFLAGS += $(GO_LDFLAGS)
- 
- ifeq ($(DOCKER_DYNAMIC_LINK),false)
 diff --git a/msp/cert.go b/msp/cert.go
 index fc823e189..93b955655 100644
 --- a/msp/cert.go
@@ -3401,16 +3387,17 @@ index fc823e189..93b955655 100644
  	"github.com/pkg/errors"
  )
 diff --git a/msp/identities.go b/msp/identities.go
-index c15219566..06e3bcf7b 100644
+index ba94ce1d5..75865dc47 100644
 --- a/msp/identities.go
 +++ b/msp/identities.go
-@@ -9,11 +9,12 @@ package msp
+@@ -9,12 +9,13 @@ package msp
  import (
  	"crypto"
  	"crypto/rand"
 -	"crypto/x509"
  	"encoding/hex"
  	"encoding/pem"
+ 	"fmt"
  	"time"
  
 +	"github.com/flyinox/crypto/x509"
@@ -3418,7 +3405,7 @@ index c15219566..06e3bcf7b 100644
  	"github.com/golang/protobuf/proto"
  	"github.com/hyperledger/fabric/bccsp"
  	"github.com/hyperledger/fabric/common/flogging"
-@@ -67,6 +68,7 @@ func newIdentity(cert *x509.Certificate, pk bccsp.Key, msp *bccspmsp) (Identity,
+@@ -68,6 +69,7 @@ func newIdentity(cert *x509.Certificate, pk bccsp.Key, msp *bccspmsp) (Identity,
  		Id:    hex.EncodeToString(digest)}
  
  	return &identity{id: id, cert: cert, pk: pk, msp: msp}, nil
@@ -3426,7 +3413,7 @@ index c15219566..06e3bcf7b 100644
  }
  
  // ExpiresAt returns the time at which the Identity expires.
-@@ -145,7 +147,17 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
+@@ -157,7 +159,17 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
  	// mspIdentityLogger.Infof("Verifying signature")
  
  	// Compute Hash
@@ -3445,7 +3432,7 @@ index c15219566..06e3bcf7b 100644
  	if err != nil {
  		return errors.WithMessage(err, "failed getting hash function options")
  	}
-@@ -196,6 +208,10 @@ func (id *identity) getHashOpt(hashFamily string) (bccsp.HashOpts, error) {
+@@ -208,6 +220,10 @@ func (id *identity) getHashOpt(hashFamily string) (bccsp.HashOpts, error) {
  		return bccsp.GetHashOpt(bccsp.SHA256)
  	case bccsp.SHA3:
  		return bccsp.GetHashOpt(bccsp.SHA3_256)
@@ -3456,7 +3443,7 @@ index c15219566..06e3bcf7b 100644
  	}
  	return nil, errors.Errorf("hash familiy not recognized [%s]", hashFamily)
  }
-@@ -222,7 +238,17 @@ func (id *signingidentity) Sign(msg []byte) ([]byte, error) {
+@@ -234,7 +250,17 @@ func (id *signingidentity) Sign(msg []byte) ([]byte, error) {
  	//mspIdentityLogger.Infof("Signing message")
  
  	// Compute Hash
@@ -3476,7 +3463,7 @@ index c15219566..06e3bcf7b 100644
  		return nil, errors.WithMessage(err, "failed getting hash function options")
  	}
 diff --git a/msp/mspimpl.go b/msp/mspimpl.go
-index 4e959d251..6274bc7da 100644
+index 4809cb950..f1444468d 100644
 --- a/msp/mspimpl.go
 +++ b/msp/mspimpl.go
 @@ -8,12 +8,13 @@ package msp
@@ -3495,7 +3482,7 @@ index 4e959d251..6274bc7da 100644
  	"github.com/hyperledger/fabric/bccsp"
  	"github.com/hyperledger/fabric/bccsp/factory"
 diff --git a/msp/mspimplsetup.go b/msp/mspimplsetup.go
-index 4c2105a60..922be851f 100644
+index e34d00fc3..cde42b923 100644
 --- a/msp/mspimplsetup.go
 +++ b/msp/mspimplsetup.go
 @@ -8,11 +8,12 @@ package msp
@@ -3513,7 +3500,7 @@ index 4c2105a60..922be851f 100644
  	"github.com/hyperledger/fabric/bccsp"
  	m "github.com/hyperledger/fabric/protos/msp"
 diff --git a/msp/mspimplvalidate.go b/msp/mspimplvalidate.go
-index 264ba878f..9518cd98a 100644
+index 3fd895ad0..e599c9eea 100644
 --- a/msp/mspimplvalidate.go
 +++ b/msp/mspimplvalidate.go
 @@ -8,9 +8,9 @@ package msp
@@ -18961,5 +18948,5 @@ index 000000000..efd117a74
 +-----END RSA PRIVATE KEY-----
 +`
 -- 
-2.17.2 (Apple Git-113)
+2.20.1 (Apple Git-117)
 
