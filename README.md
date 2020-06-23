@@ -1,6 +1,6 @@
 ## Hyperledger Fabric 国密补丁
 
-用于Hyperledger Fabric项目支持国密算法，支持V1.1.x以上版本
+用于Hyperledger Fabric项目支持国密算法，支持release-1.4版本
 
 cryptogen工具配套支持
 
